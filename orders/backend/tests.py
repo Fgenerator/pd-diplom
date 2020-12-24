@@ -44,11 +44,13 @@ class EmailConfirmationTestCase(APITestCase):
         data = {'email': self.user.email, 'token': self.token.key}
         response = self.client.post('/user/register/confirm', data)
         self.assertEqual(response.json()['Status'], True)
+        self.assertTrue(User.objects.filter(id=self.user.id).first().is_active)
 
     def test_account_confirm_without_token(self):
         data = {'email': self.user.email}
         response = self.client.post('/user/register/confirm', data)
         self.assertEqual(response.json()['Status'], False)
+        self.assertFalse(User.objects.filter(id=self.user.id).first().is_active)
 
 
 class AccountDetailsTestCase(APITestCase):
