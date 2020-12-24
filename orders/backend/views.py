@@ -1,7 +1,9 @@
+from rest_framework import viewsets
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, get_object_or_404
 
 from ujson import loads as load_json
 from yaml import load as load_yaml, Loader
@@ -23,6 +25,8 @@ from .serializers import TestProductSerializer, UserSerializer, CategorySerializ
     ProductInfoSerializer, OrderSerializer, OrderItemSerializer, ContactSerializer
 
 from .signals import new_user_registered, new_order, user_changed_email, new_waybill
+
+from .tasks import user_changed_email_task
 
 
 class TestView(APIView):
@@ -176,8 +180,11 @@ class AccountDetails(APIView):
             db_user = User.objects.filter(id=request.user.id).first()
             if 'email' in request.data and request.data['email'] != db_user.email:
                 try:
-                    user_changed_email.send(sender=self.__class__, user_id=db_user.id,
-                                            email=user_serializer.validated_data['email'])
+                    # user_changed_email.send(sender=self.__class__, user_id=db_user.id,
+                    #                        email=user_serializer.validated_data['email'])
+                    task = user_changed_email_task.delay(user_id=db_user.id,
+                                                         email=user_serializer.validated_data['email'])
+                    print(f"id={task.id}, state={task.state}, status={task.status}")
                 except Exception as email_error:
                     return JsonResponse({'Status': False, 'Errors': {'email': str(email_error)}})
                 user_serializer.validated_data['is_active'] = False
@@ -212,6 +219,8 @@ class CategoryView(ListAPIView):
     """
     Класс для просмотра категорий+
     """
+    #throttle_classes = [AnonRateThrottle]
+
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
@@ -561,7 +570,6 @@ class OrderView(APIView):
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
-
                         shop_user = User.objects.filter(
                             shop__product_infos__ordered_items__order=request.data['id']).distinct()
 
@@ -572,3 +580,33 @@ class OrderView(APIView):
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+
+
+class CategoryViewSet(viewsets.ViewSet):
+    """
+    ViewSet для просмотра категорий
+    """
+
+    """
+    A simple ViewSet that for listing or retrieving users.
+    """
+
+    def list(self, request):
+        queryset = Category.objects.all()
+        serializer = CategorySerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        queryset = Category.objects.all()
+        category = get_object_or_404(queryset, pk=pk)
+        serializer = CategorySerializer(category)
+        return Response(serializer.data)
+
+
+class CategoryModelViewSet(viewsets.ModelViewSet):
+    """
+    ModelViewSet для работы с категориями
+    """
+
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
