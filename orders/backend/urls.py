@@ -16,8 +16,11 @@ Including another URLconf
 from django.urls import path
 from django_rest_passwordreset.views import reset_password_request_token, reset_password_confirm
 
-from .views import TestView, PartnerUpdate, RegisterAccount, LoginAccount, CategoryView, ShopView, ProductInfoView,\
-    BasketView, AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount
+from .views import TestView, PartnerUpdate, RegisterAccount, LoginAccount, CategoryView, ShopView, ProductInfoView, \
+    BasketView, AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount, CategoryViewSet, \
+    CategoryModelViewSet
+
+from rest_framework.routers import DefaultRouter
 
 app_name = 'backend'
 
@@ -38,4 +41,11 @@ urlpatterns = [
     path('products', ProductInfoView.as_view(), name='shops'),
     path('basket', BasketView.as_view(), name='basket'),
     path('order', OrderView.as_view(), name='order'),
+    path('cates/', CategoryViewSet.as_view({'get': 'list'})),
+    path('cates/<int:pk>', CategoryViewSet.as_view({'get': 'retrieve'})),
 ]
+
+router = DefaultRouter()
+router.register(r'categs', CategoryModelViewSet, basename='categs')
+
+urlpatterns += router.urls
